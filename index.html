@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Fnaf IRL v6.1 Fix</title>
+    <title>Fnaf IRL v6.3</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -12,14 +12,16 @@
         .terminal { width: 600px; border: 2px solid #1a1a1a; padding: 20px; position: relative; display: none; background: #000; z-index: 10; }
         .settings-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; font-size: 1.5rem; z-index: 20; }
         #settingsBox { display: none; background: #050505; border: 1px solid #00ff41; padding: 15px; margin-bottom: 15px; }
+        .input-group { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.9rem; }
+        input { width: 50px; background: #000; color: #00ff41; border: 1px solid #00ff41; padding: 5px; text-align: center; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
         .btn { padding: 12px; background: #000; border: 1px solid #00ff41; color: #00ff41; cursor: pointer; font-family: inherit; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
         .btn:hover { background: rgba(0, 255, 65, 0.3); box-shadow: 0 0 10px #00ff41; }
+        .btn-active { background: #00ff41 !important; color: #000 !important; }
         .btn-night.active { background: #f0f !important; color: #fff !important; border-color: #fff !important; box-shadow: 0 0 30px #f0f; animation: pulse 1s infinite; }
         .btn-red { border-color: #f00; color: #f00; }
         #hostStatusLog { margin-top: 15px; padding: 10px; border-top: 1px solid #1a1a1a; font-size: 0.8rem; text-align: center; }
         #playerUI { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; background: #000; }
-        #waitMsg { font-size: 2rem; color: #555; }
         #clock { font-size: 12rem; text-shadow: 0 0 30px #00ff41; display: none; }
         #screamImg { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 99999; }
         #winScreen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; flex-direction: column; justify-content: center; align-items: center; }
@@ -37,9 +39,11 @@
     <div id="hostUI" class="terminal">
         <div class="settings-btn" onclick="toggleSettings()">⚙️</div>
         <div id="settingsBox">
-            <div style="margin-bottom: 10px;">МИНУТ В ЧАСЕ: <input type="number" id="hourInput" value="5" style="width:40px; background:#000; color:#00ff41; border:1px solid #00ff41;"></div>
+            <div class="input-group">
+                ЧАС: <input type="number" id="minInput" value="1"> м. <input type="number" id="secInput" value="30"> с.
+            </div>
             <button class="btn" style="width: 100%; margin-bottom: 5px;" onclick="beginNight()">START NIGHT</button>
-            <button class="btn" style="width: 100%; border-color: gold; color: gold;" onclick="finishNight()">FINISH (WIN)</button>
+            <button class="btn" style="width: 100%; border-color: gold; color: gold;" onclick="finishNight()">MANUAL WIN</button>
         </div>
 
         <div style="font-size: 0.8rem; margin-bottom: 10px;">STATUS: <span id="statusTxt" style="color:#f00;">OFFLINE</span></div>
@@ -47,8 +51,8 @@
         <div class="grid">
             <button class="btn" onclick="playSnd('door')">STEPS</button>
             <button class="btn" onclick="playSnd('closet')">BREATH</button>
-            <button class="btn" onclick="toggleMode('auto')">AUTO MODE</button>
-            <button class="btn" onclick="toggleMode('hard')">HARD MODE</button>
+            <button id="modeNormal" class="btn" onclick="toggleMode('normal')">NORMAL MODE</button>
+            <button id="modeHard" class="btn" onclick="toggleMode('hard')">HARD MODE</button>
             <button id="nightBtn" class="btn btn-night" style="border-color:#f0f; color:#f0f;" onclick="toggleNightmare()">NIGHTMARE</button>
             <button class="btn btn-red" onclick="triggerScream()">SCREAMER</button>
             <button class="btn btn-red" style="grid-column: span 2;" onclick="stopGame(true)">EMERGENCY STOP</button>
@@ -63,15 +67,15 @@
     </div>
 
     <div id="playerUI">
-        <div id="waitMsg">ОЖИДАНИЕ ХОСТА...</div>
         <div id="clock">12:00</div>
-        <img id="screamImg" src="screamer.png" alt="">
+        <img id="screamImg" src="screamer.png">
         <div id="winScreen"><div style="font-size:15rem;">👑</div><div style="color: gold; font-size: 4rem;">6 AM</div></div>
     </div>
 
     <script>
         const ROOM_ID = 'fnaf-irl-secure-room-v1';
-        let peer, conn, gameHour = 0, clockTimer, autoTimer, nightmareTimer, recognition = null;
+        let peer, conn, gameHour = 0, clockTimer, recognition = null;
+        let currentMode = null, lastSound = null, modeIsRunning = false;
 
         function setHostLog(msg, color="#00ff41") {
             const log = document.getElementById('hostStatusLog');
@@ -88,56 +92,79 @@
             document.getElementById('hostUI').style.display = 'block';
             initVoice();
             peer = new Peer(ROOM_ID);
-            peer.on('connection', c => {
-                conn = c;
-                document.getElementById('statusTxt').innerText = "ONLINE";
-                document.getElementById('statusTxt').style.color = "#00ff41";
-            });
+            peer.on('connection', c => { conn = c; document.getElementById('statusTxt').innerText = "ONLINE"; document.getElementById('statusTxt').style.color = "#00ff41"; });
         }
 
-        function triggerScream() {
-            // Сначала останавливаем всё остальное, кроме window
-            stopGame(false); 
+        // --- УМНЫЙ ПРОИГРЫВАТЕЛЬ РЕЖИМОВ ---
+        async function runModeLoop() {
+            if (!modeIsRunning) return;
+
+            const sounds = ['door', 'closet'];
+            let nextSnd;
+
+            // Выбираем звук, отличный от предыдущего
+            do {
+                nextSnd = sounds[Math.floor(Math.random() * sounds.length)];
+            } while (nextSnd === lastSound);
             
-            const s = document.getElementById('snd-window');
-            if(s) {
-                s.currentTime = 0;
-                s.play().catch(e => setHostLog("SND ERR: " + e.message, "red"));
+            lastSound = nextSnd;
+            const audio = document.getElementById('snd-' + nextSnd);
+
+            // Проигрываем и ждем завершения
+            await new Promise(resolve => {
+                audio.currentTime = 0;
+                audio.play();
+                audio.onended = resolve;
+            });
+
+            // Пауза после звука
+            let pauseTime = currentMode === 'normal' ? (Math.random() * 2000 + 1000) : 1000; 
+            setHostLog(`WAITING ${pauseTime/1000}s...`);
+
+            setTimeout(() => {
+                if (modeIsRunning) runModeLoop();
+            }, pauseTime);
+        }
+
+        function toggleMode(m) {
+            if (currentMode === m) {
+                stopGame(true);
+            } else {
+                stopGame(true); // Сброс всего старого
+                currentMode = m;
+                modeIsRunning = true;
+                document.getElementById(m === 'normal' ? 'modeNormal' : 'modeHard').classList.add('btn-active');
+                setHostLog(`MODE: ${m.toUpperCase()} START`);
+                runModeLoop();
             }
-            
-            if(conn) conn.send({ action: 'scream' });
-            setHostLog("SCREAMER TRIGGERED!", "#f00");
         }
 
         function stopGame(stopScreamerToo = true) {
             clearInterval(clockTimer);
-            clearTimeout(autoTimer); autoTimer = null;
-            clearTimeout(nightmareTimer);
+            modeIsRunning = false;
+            currentMode = null;
+            document.getElementById('modeNormal').classList.remove('btn-active');
+            document.getElementById('modeHard').classList.remove('btn-active');
             
             const nightmareSnd = document.getElementById('snd-nightmare');
             nightmareSnd.pause(); nightmareSnd.currentTime = 0;
             document.getElementById('nightBtn').classList.remove('active');
             if(recognition) try { recognition.stop(); } catch(e){}
 
-            // Останавливаем все аудио, кроме скримера, если это вызов скримера
             document.querySelectorAll('audio').forEach(a => {
                 if(stopScreamerToo || (a.id !== 'snd-window' && a.id !== 'snd-win')) {
-                    a.pause();
-                    a.currentTime = 0;
+                    a.pause(); a.currentTime = 0;
+                    a.onended = null;
                 }
             });
-
             if(conn) conn.send({ action: 'stop' });
         }
 
-        function toggleNightmare() {
-            const s = document.getElementById('snd-nightmare'), b = document.getElementById('nightBtn');
-            if(s.paused) {
-                s.play(); b.classList.add('active');
-                if(recognition) try { recognition.start(); } catch(e){}
-                setHostLog("NIGHTMARE ACTIVE", "#f0f");
-                nightmareTimer = setTimeout(() => { if(!s.paused) triggerScream(); }, 10000);
-            } else { stopGame(true); }
+        function triggerScream() {
+            stopGame(false); 
+            const s = document.getElementById('snd-window');
+            if(s) { s.currentTime = 0; s.play(); }
+            if(conn) conn.send({ action: 'scream' });
         }
 
         function beginNight() {
@@ -145,59 +172,45 @@
             if(conn) conn.send({ action: 'start' });
             startClock();
             toggleSettings();
-            setHostLog("NIGHT STARTED");
         }
 
         function startClock() {
             clearInterval(clockTimer);
-            let ms = document.getElementById('hourInput').value * 60000;
+            const totalMs = ((parseInt(document.getElementById('minInput').value) || 0) * 60 + (parseInt(document.getElementById('secInput').value) || 0)) * 1000;
             clockTimer = setInterval(() => {
-                gameHour++; if(gameHour > 6) gameHour = 6;
+                gameHour++;
                 if(conn) conn.send({ action: 'time', h: gameHour });
-            }, ms);
-        }
-
-        function playSnd(n) { 
-            const s = document.getElementById('snd-'+n); 
-            if(s) { s.currentTime = 0; s.play(); }
-        }
-
-        function toggleMode(m) {
-            if(autoTimer) stopGame(true);
-            else {
-                const loop = () => {
-                    playSnd(Math.random() > 0.5 ? 'door' : 'closet');
-                    autoTimer = setTimeout(loop, m === 'auto' ? 8000 : 3000);
-                };
-                loop();
-                setHostLog("MODE: " + m.toUpperCase());
-            }
+                if(gameHour >= 6) { clearInterval(clockTimer); setTimeout(finishNight, 2500); }
+            }, totalMs);
         }
 
         function finishNight() {
             playSnd('win');
             if(conn) conn.send({ action: 'win' });
             stopGame(false);
-            setHostLog("WIN!", "gold");
-            toggleSettings();
         }
+
+        function toggleNightmare() {
+            const s = document.getElementById('snd-nightmare'), b = document.getElementById('nightBtn');
+            if(s.paused) {
+                s.play(); b.classList.add('active');
+                if(recognition) try { recognition.start(); } catch(e){}
+                setTimeout(() => { if(!s.paused) triggerScream(); }, 10000);
+            } else { stopGame(true); }
+        }
+
+        function playSnd(n) { const s = document.getElementById('snd-'+n); if(s) { s.currentTime=0; s.play(); } }
 
         function initVoice() {
             const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!Speech) return;
-            recognition = new Speech();
-            recognition.lang = 'ru-RU';
-            recognition.continuous = true;
+            recognition = new Speech(); recognition.lang = 'ru-RU'; recognition.continuous = true;
             recognition.onresult = (e) => {
                 const text = e.results[e.results.length - 1][0].transcript.toLowerCase();
-                if (text.includes("иди вон") || text.includes("вон")) {
-                    setHostLog("ИЗГНАН ГОЛОСОМ!");
-                    stopGame(true);
-                }
+                if (text.includes("иди вон") || text.includes("вон")) stopGame(true);
             };
         }
 
-        // --- PLAYER ---
         function startAsPlayer() {
             document.getElementById('setupOverlay').style.display = 'none';
             document.getElementById('playerUI').style.display = 'flex';
@@ -209,18 +222,16 @@
                         c.on('data', data => {
                             const img = document.getElementById('screamImg');
                             const clk = document.getElementById('clock');
-                            const wait = document.getElementById('waitMsg');
                             if(data.action === 'start') {
                                 document.getElementById('winScreen').style.display = 'none';
-                                wait.style.display = 'none'; img.style.display = 'none'; 
-                                clk.style.display = 'block'; clk.innerText = "12:00";
+                                img.style.display = 'none'; clk.style.display = 'block'; clk.innerText = "12:00";
                             }
                             if(data.action === 'time') clk.innerText = data.h + ":00";
                             if(data.action === 'win') document.getElementById('winScreen').style.display = 'flex';
                             if(data.action === 'scream') {
-                                img.src = "screamer.png?t=" + new Date().getTime();
+                                img.src = "screamer.png?t=" + Date.now();
                                 img.style.display = 'block'; clk.style.display = 'none';
-                                setTimeout(() => { img.style.display = 'none'; }, 3000);
+                                setTimeout(() => img.style.display = 'none', 3000);
                             }
                         });
                     });
