@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Fnaf IRL v5.8</title>
+    <title>Fnaf IRL v5.9</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -12,11 +12,13 @@
         .start-btn:hover { background: #00ff41; color: #000; box-shadow: 0 0 20px #00ff41; }
 
         .terminal { width: 600px; border: 2px solid #1a1a1a; padding: 20px; position: relative; display: none; background: #000; z-index: 10; }
+        .settings-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; font-size: 1.5rem; z-index: 20; }
+        
         #settingsBox { display: none; background: #050505; border: 1px solid #00ff41; padding: 15px; margin-bottom: 15px; }
         
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
         .btn { padding: 12px; background: #000; border: 1px solid #00ff41; color: #00ff41; cursor: pointer; font-family: inherit; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
-        .btn:hover { background: rgba(0, 255, 65, 0.2); box-shadow: 0 0 10px #00ff41; }
+        .btn:hover { background: rgba(0, 255, 65, 0.3); box-shadow: 0 0 10px #00ff41; }
         
         /* Nightmare Кнопка */
         .btn-night.active { background: #f0f !important; color: #fff !important; border-color: #fff !important; box-shadow: 0 0 30px #f0f; animation: pulse 1s infinite; }
@@ -28,11 +30,13 @@
 
         /* ИНТЕРФЕЙС ИГРОКА */
         #playerUI { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; background: #000; }
-        #clock { font-size: 12rem; text-shadow: 0 0 30px #00ff41; z-index: 5; }
+        #waitMsg { font-size: 2rem; color: #555; animation: blink text 2s infinite; }
+        #clock { font-size: 12rem; text-shadow: 0 0 30px #00ff41; z-index: 5; display: none; }
         #screamImg { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 99999; }
         #winScreen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; flex-direction: column; justify-content: center; align-items: center; }
 
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -44,10 +48,12 @@
     </div>
 
     <div id="hostUI" class="terminal">
-        <div class="btn" style="float:right; padding: 5px 10px;" onclick="toggleSettings()">⚙️</div>
+        <div class="settings-btn" onclick="toggleSettings()">⚙️</div>
+        
         <div id="settingsBox">
-            <div>МИНУТ В ЧАСЕ: <input type="number" id="hourInput" value="5" style="width:40px; background:#000; color:#00ff41; border:1px solid #00ff41;"></div>
-            <button class="btn" style="width: 100%; margin-top: 10px;" onclick="beginNight()">START NIGHT</button>
+            <div style="margin-bottom: 10px;">МИНУТ В ЧАСЕ: <input type="number" id="hourInput" value="5" style="width:40px; background:#000; color:#00ff41; border:1px solid #00ff41;"></div>
+            <button class="btn" style="width: 100%; margin-bottom: 5px;" onclick="beginNight()">START NIGHT</button>
+            <button class="btn" style="width: 100%; border-color: gold; color: gold;" onclick="finishNight()">FINISH (WIN)</button>
         </div>
 
         <div style="font-size: 0.8rem; margin-bottom: 10px;">STATUS: <span id="statusTxt" style="color:#f00;">OFFLINE</span></div>
@@ -59,8 +65,7 @@
             <button class="btn" onclick="toggleMode('hard')">HARD MODE</button>
             <button id="nightBtn" class="btn btn-night" style="border-color:#f0f; color:#f0f;" onclick="toggleNightmare()">NIGHTMARE</button>
             <button class="btn btn-red" onclick="triggerScream()">SCREAMER</button>
-            <button class="btn btn-red" style="grid-column: span 2;" onclick="stopGame()">STOP GAME</button>
-            <button class="btn" style="grid-column: span 2; border-color: gold; color: gold;" onclick="finishNight()">WIN (6 AM)</button>
+            <button class="btn btn-red" style="grid-column: span 2;" onclick="stopGame()">EMERGENCY STOP</button>
         </div>
         <div id="hostStatusLog">READY</div>
 
@@ -72,6 +77,7 @@
     </div>
 
     <div id="playerUI">
+        <div id="waitMsg">ОЖИДАНИЕ ХОСТА...</div>
         <div id="clock">12:00</div>
         <img id="screamImg" src="screamer.png" alt="">
         <div id="winScreen"><div style="font-size:15rem;">👑</div><div style="color: gold; font-size: 4rem;">6 AM</div></div>
@@ -194,9 +200,10 @@
             if(conn) conn.send({ action: 'win' });
             stopGame();
             setHostLog("WIN!", "gold");
+            toggleSettings();
         }
 
-        // --- ЛОГИКА ИГРОКА (ТОЛЬКО КАРТИНКА) ---
+        // --- ЛОГИКА ИГРОКА ---
         function startAsPlayer() {
             document.getElementById('setupOverlay').style.display = 'none';
             document.getElementById('playerUI').style.display = 'flex';
@@ -208,19 +215,31 @@
                         c.on('data', data => {
                             const img = document.getElementById('screamImg');
                             const clk = document.getElementById('clock');
+                            const wait = document.getElementById('waitMsg');
+                            
                             if(data.action === 'start') {
                                 document.getElementById('winScreen').style.display = 'none';
-                                img.style.display = 'none'; clk.style.display = 'block';
+                                wait.style.display = 'none'; // Убираем ожидание
+                                img.style.display = 'none'; 
+                                clk.style.display = 'block'; // Показываем часы
+                                clk.innerText = "12:00";
                             }
+                            
                             if(data.action === 'time') clk.innerText = data.h + ":00";
                             if(data.action === 'win') document.getElementById('winScreen').style.display = 'flex';
+                            
                             if(data.action === 'scream') {
                                 img.src = "screamer.png?t=" + new Date().getTime();
                                 img.style.display = 'block';
                                 clk.style.display = 'none';
-                                setTimeout(() => { img.style.display = 'none'; clk.style.display = 'block'; }, 4000);
+                                // Через 3 секунды скример пропадет, но часы не вернутся (темный экран смерти)
+                                setTimeout(() => { img.style.display = 'none'; }, 3000);
                             }
-                            if(data.action === 'stop') { /* Просто замирает */ }
+                            
+                            if(data.action === 'stop') { 
+                                // При остановке ничего не делаем, просто часы замирают.
+                                // Если хост нажмет "Начать ночь", всё сбросится.
+                            }
                         });
                     });
                     c.on('error', () => setTimeout(connect, 3000));
