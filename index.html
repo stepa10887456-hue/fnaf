@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>FNAF Terminal v5.3</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #000; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
+        #setupOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 5000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; }
+        .start-btn { padding: 15px 30px; border: 2px solid #00ff41; background: none; color: #00ff41; font-family: inherit; font-size: 1.2rem; cursor: pointer; transition: 0.3s; }
+        .start-btn:hover { background: #00ff41; color: #000; box-shadow: 0 0 15px #00ff41; }
+
+        .terminal { width: 600px; border: 2px solid #1a1a1a; padding: 20px; position: relative; display: none; background: #000; }
+        .settings-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; font-size: 1.2rem; opacity: 0.7; }
+        
+        #settingsBox { display: none; background: #050505; border: 1px solid #00ff41; padding: 15px; margin-bottom: 15px; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .btn { padding: 12px; background: #000; border: 1px solid #00ff41; color: #00ff41; cursor: pointer; font-family: inherit; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+        
+        /* Подсветка всех кнопок */
+        .btn:hover { background: rgba(0, 255, 65, 0.2); box-shadow: 0 0 10px rgba(0, 255, 65, 0.4); }
+        .btn-red:hover { background: rgba(255, 0, 0, 0.2); border-color: #f00; }
+        .btn-win-btn:hover { background: #00ff41 !important; color: #000; }
+
+        .btn-red { border-color: #800; color: #f00; }
+        .btn-night.active { background: #f0f; color: #000; border-color: #f0f; box-shadow: 0 0 15px #f0f; }
+
+        #hostStatusLog { margin-top: 15px; padding: 10px; border-top: 1px solid #1a1a1a; font-size: 0.9rem; text-align: center; height: 20px; }
+
+        /* ИГРОК */
+        #playerUI { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; background: #000; }
+        #clock { font-size: 12rem; text-shadow: 0 0 30px #00ff41; }
+        
+        #winScreen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; flex-direction: column; justify-content: center; align-items: center; }
+        .crown-icon { font-size: 20rem; filter: drop-shadow(0 0 20px gold); animation: pulse 2s infinite; }
+        
+        /* КАРТИНКА СКРИМЕРА */
+        #screamImg { 
+            display: none; position: fixed; top: 0; left: 0; 
+            width: 100vw; height: 100vh; object-fit: cover; 
+            z-index: 20000; 
+        }
+
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    </style>
+</head>
+<body>
+
+    <div id="setupOverlay">
+        <div style="font-size: 2rem; margin-bottom: 20px;">[ SYSTEM ACCESS ]</div>
+        <button class="start-btn" onclick="startAsHost()">ADMIN (HOST)</button>
+        <button class="start-btn" onclick="startAsPlayer()">USER (PLAYER)</button>
+    </div>
+
+    <div id="hostUI" class="terminal">
+        <div class="settings-btn" onclick="toggleSettings()">⚙</div>
+        <div style="border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 15px; font-weight: bold;">FAZBEAR_OS v5.3</div>
+
+        <div id="settingsBox">
+            <div style="margin-bottom: 10px;">МИНУТ В ЧАСЕ: <input type="number" id="hourInput" value="5" style="width:40px; background:#000; color:#00ff41; border:1px solid #00ff41;"></div>
+            <button class="btn" style="width: 100%; margin-bottom: 5px;" onclick="beginNight()">НАЧАТЬ НОЧЬ</button>
+            <button class="btn btn-win-btn" style="width: 100%; background:none; border: 1px solid #00ff41;" onclick="finishNight()">ЗАВЕРШИТЬ НОЧЬ (WIN)</button>
+        </div>
+
+        <div style="font-size: 0.8rem; opacity: 0.6;">STATUS: <span id="statusTxt" style="color:#f00;">OFFLINE</span></div>
+
+        <div class="grid">
+            <button class="btn" onclick="playSnd('door')">STEPS</button>
+            <button class="btn" onclick="playSnd('closet')">BREATH</button>
+            <button class="btn" onclick="toggleMode('auto')">AUTO MODE</button>
+            <button class="btn" onclick="toggleMode('hard')">HARD MODE</button>
+            <button id="nightBtn" class="btn btn-night" onclick="toggleNightmare()">NIGHTMARE</button>
+            <button class="btn btn-red" onclick="sendScream()">SCREAMER</button>
+            <button class="btn btn-red" style="grid-column: span 2;" onclick="stopAll()">EMERGENCY STOP</button>
+        </div>
+        
+        <div id="hostStatusLog">ОЖИДАНИЕ ДЕЙСТВИЙ...</div>
+        <div id="voiceStatus" style="font-size: 0.7rem; color: #f0f; text-align: center; display: none;">МИКРОФОН: СЛУШАЮ 'ИДИ ВОН'...</div>
+    </div>
+
+    <div id="playerUI">
+        <div id="clock" style="display:none">12:00</div>
+        <div id="winScreen"><div class="crown-icon">👑</div><div style="color: gold; font-size: 4rem; font-weight: bold;">6 AM</div></div>
+        <img id="screamImg" src="screamer.png" alt="SCREAMER">
+    </div>
+
+    <audio id="snd-door" src="door.mp3"></audio>
+    <audio id="snd-closet" src="closet.mp3"></audio>
+    <audio id="snd-window" src="window.mp3"></audio>
+    <audio id="snd-nightmare" src="nightmare.mp3" loop></audio>
+    <audio id="snd-win" src="win.mp3"></audio>
+
+    <script>
+        let peer, conn, gameHour = 0, clockTimer, autoTimer, nightmareTimer, recognition = null;
+
+        function toggleSettings() {
+            const b = document.getElementById('settingsBox');
+            b.style.display = b.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function setHostLog(msg, color="#00ff41") {
+            const log = document.getElementById('hostStatusLog');
+            log.innerText = msg;
+            log.style.color = color;
+        }
+
+        // --- ГОЛОС ---
+        function initVoice() {
+            const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!Speech) return;
+            recognition = new Speech();
+            recognition.lang = 'ru-RU';
+            recognition.continuous = true;
+            recognition.onresult = (e) => {
+                const text = e.results[e.results.length - 1][0].transcript.toLowerCase();
+                if (text.includes("иди вон") || text.includes("вон")) {
+                    setHostLog("ОТПУГНУЛ ЧЕРЕЗ ГОЛОС!");
+                    stopAll();
+                }
+            };
+        }
+
+        // --- ХОСТ ---
+        function startAsHost() {
+            document.getElementById('setupOverlay').style.display = 'none';
+            document.getElementById('hostUI').style.display = 'block';
+            initVoice();
+            peer = new Peer('admin-fnaf-room');
+            peer.on('connection', c => {
+                conn = c;
+                document.getElementById('statusTxt').innerText = "ONLINE";
+                document.getElementById('statusTxt').style.color = "#00ff41";
+            });
+        }
+
+        function toggleNightmare() {
+            const s = document.getElementById('snd-nightmare'), b = document.getElementById('nightBtn');
+            if(s.paused) {
+                stopAll();
+                s.play();
+                b.classList.add('active');
+                document.getElementById('voiceStatus').style.display = 'block';
+                if(recognition) try { recognition.start(); } catch(e){}
+                setHostLog("NIGHTMARE АКТИВЕН!", "#f0f");
+
+                nightmareTimer = setTimeout(() => {
+                    if(!s.paused) {
+                        sendScream();
+                        setHostLog("[РЕЗУЛЬТАТ: ИГРОК УБИТ ТАЙМЕРОМ]", "#f00");
+                        stopAll();
+                    }
+                }, 10000); 
+            } else { stopAll(); }
+        }
+
+        function sendScream() {
+            if(conn) conn.send({ action: 'scream' });
+            playSnd('window');
+            setHostLog("[РЕЗУЛЬТАТ: ИГРОК УБИТ]", "#f00");
+        }
+
+        function beginNight() {
+            gameHour = 0;
+            if(conn) conn.send({ action: 'start' });
+            startClock();
+            toggleSettings();
+            setHostLog("НОЧЬ НАЧАЛАСЬ");
+        }
+
+        function finishNight() {
+            playSnd('win');
+            if(conn) conn.send({ action: 'win' });
+            setHostLog("[РЕЗУЛЬТАТ: ИГРОК ВЫЖИЛ]", "gold");
+            stopAll();
+            toggleSettings();
+        }
+
+        function startClock() {
+            clearInterval(clockTimer);
+            let ms = document.getElementById('hourInput').value * 60000;
+            clockTimer = setInterval(() => {
+                gameHour++; if(gameHour > 6) gameHour = 6;
+                if(conn) conn.send({ action: 'time', h: gameHour });
+                if(gameHour === 6) setHostLog("ВРЕМЯ: 6 УТРА!");
+            }, ms);
+        }
+
+        // --- ИГРОК ---
+        function startAsPlayer() {
+            document.getElementById('setupOverlay').style.display = 'none';
+            document.getElementById('playerUI').style.display = 'flex';
+            peer = new Peer();
+            peer.on('open', () => {
+                const connect = () => {
+                    const c = peer.connect('admin-fnaf-room');
+                    c.on('open', () => {
+                        c.on('data', data => {
+                            const img = document.getElementById('screamImg');
+                            if(data.action === 'start') {
+                                document.getElementById('winScreen').style.display = 'none';
+                                img.style.display = 'none';
+                                document.getElementById('clock').style.display = 'block';
+                                document.getElementById('clock').innerText = "12:00";
+                            }
+                            if(data.action === 'time') document.getElementById('clock').innerText = data.h + ":00";
+                            if(data.action === 'win') document.getElementById('winScreen').style.display = 'flex';
+                            if(data.action === 'scream') {
+                                img.style.display = 'block';
+                                setTimeout(() => img.style.display = 'none', 3000);
+                            }
+                            if(data.action === 'stop') {
+                                // Очистка при остановке
+                            }
+                        });
+                    });
+                    c.on('error', () => setTimeout(connect, 3000));
+                };
+                connect();
+            });
+        }
+
+        function playSnd(n) { const s = document.getElementById('snd-'+n); s.currentTime = 0; s.play(); }
+
+        function toggleMode(m) {
+            if(autoTimer) stopAll();
+            else {
+                const loop = () => {
+                    playSnd(Math.random() > 0.5 ? 'door' : 'closet');
+                    autoTimer = setTimeout(loop, m === 'auto' ? 8000 : 3000);
+                };
+                loop();
+                setHostLog("РЕЖИМ: " + m.toUpperCase());
+            }
+        }
+
+        function stopAll() {
+            clearTimeout(autoTimer); autoTimer = null;
+            clearTimeout(nightmareTimer); nightmareTimer = null;
+            clearInterval(clockTimer);
+            document.querySelectorAll('audio').forEach(a => { if(a.id !== 'snd-win') { a.pause(); a.currentTime = 0; } });
+            document.getElementById('nightBtn').classList.remove('active');
+            document.getElementById('voiceStatus').style.display = 'none';
+            if(recognition) try { recognition.stop(); } catch(e){}
+            if(conn) conn.send({ action: 'stop' });
+        }
+    </script>
+</body>
+</html>
