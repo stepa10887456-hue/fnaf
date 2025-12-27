@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Fnaf IRL v6.4 Stable</title>
+    <title>Fnaf IRL v6.5 Performance</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -51,9 +51,9 @@
             <button id="modeHard" class="btn" onclick="toggleMode('hard')">HARD MODE</button>
             <button id="nightBtn" class="btn btn-night" style="border-color:#f0f; color:#f0f;" onclick="toggleNightmare()">NIGHTMARE</button>
             <button class="btn btn-red" onclick="triggerScream()">SCREAMER</button>
-            <button class="btn btn-red" style="grid-column: span 2;" onclick="stopGame(true)">EMERGENCY STOP</button>
+            <button class="btn btn-red" style="grid-column: span 2;" onclick="stopGame()">EMERGENCY STOP</button>
         </div>
-        <div id="hostStatusLog">ID: fnaf-irl-room</div>
+        <div id="hostStatusLog">ID: fnaf-irl-room-v6</div>
 
         <audio id="snd-door" src="door.mp3" preload="auto"></audio>
         <audio id="snd-closet" src="closet.mp3" preload="auto"></audio>
@@ -63,16 +63,16 @@
     </div>
 
     <div id="playerUI">
-        <div id="waitMsg" style="font-size: 2rem; color: #444;">ОЖИДАНИЕ ХОСТА...</div>
         <div id="clock">12:00</div>
         <img id="screamImg" src="screamer.png">
         <div id="winScreen"><div style="font-size:15rem;">👑</div><div style="color: gold; font-size: 4rem;">6 AM</div></div>
     </div>
 
     <script>
-        const ROOM_ID = 'fnaf-irl-room-v6'; // Постоянный ID для простоты
+        const ROOM_ID = 'fnaf-irl-room-v6';
         let peer, conn, gameHour = 0, clockTimer, recognition = null;
         let currentMode = null, lastSound = null, modeIsRunning = false;
+        let nightmareTimer = null;
 
         function setHostLog(msg, color="#00ff41") {
             const log = document.getElementById('hostStatusLog');
@@ -84,31 +84,45 @@
             s.style.display = s.style.display === 'block' ? 'none' : 'block';
         }
 
-        // --- HOST ---
         function startAsHost() {
             document.getElementById('setupOverlay').style.display = 'none';
             document.getElementById('hostUI').style.display = 'block';
             initVoice();
             peer = new Peer(ROOM_ID);
-            
-            peer.on('open', id => {
-                document.getElementById('statusTxt').innerText = "WAITING FOR PLAYER...";
-                setHostLog("ID: " + id);
-            });
-
+            peer.on('open', id => setHostLog("ЖДУ ИГРОКА (ID: " + id + ")"));
             peer.on('connection', c => {
                 conn = c;
                 document.getElementById('statusTxt').innerText = "PLAYER CONNECTED";
                 document.getElementById('statusTxt').style.color = "#00ff41";
                 setHostLog("ИГРОК ПОДКЛЮЧЕН", "#00ff41");
             });
+        }
 
-            peer.on('error', err => {
-                console.error(err);
-                if(err.type === 'unavailable-id') {
-                    setHostLog("ID ЗАНЯТ! ОБНОВИТЕ СТРАНИЦУ", "#f00");
+        // --- ТОЛЬКО ОСТАНОВКА ЗВУКОВЫХ ЦИКЛОВ (БЕЗ ЧАСОВ) ---
+        function stopAudioCycles() {
+            modeIsRunning = false;
+            currentMode = null;
+            document.getElementById('modeNormal').classList.remove('btn-active');
+            document.getElementById('modeHard').classList.remove('btn-active');
+            
+            clearTimeout(nightmareTimer);
+            const ns = document.getElementById('snd-nightmare');
+            ns.pause(); ns.currentTime = 0;
+            document.getElementById('nightBtn').classList.remove('active');
+            
+            document.querySelectorAll('audio').forEach(a => {
+                if(a.id !== 'snd-window' && a.id !== 'snd-win') {
+                    a.pause(); a.currentTime = 0; a.onended = null;
                 }
             });
+        }
+
+        // --- ПОЛНАЯ ОСТАНОВКА ИГРЫ (ВКЛЮЧАЯ ЧАСЫ) ---
+        function stopGame() {
+            clearInterval(clockTimer);
+            stopAudioCycles();
+            if(conn) conn.send({ action: 'stop' });
+            setHostLog("ИГРА ОСТАНОВЛЕНА", "red");
         }
 
         async function runModeLoop() {
@@ -126,16 +140,19 @@
             });
 
             if (modeIsRunning) {
-                let p = currentMode === 'normal' ? (Math.random() * 2000 + 1000) : 800;
+                let p = currentMode === 'normal' ? (Math.random() * 2000 + 2000) : 1000;
                 setTimeout(() => { if(modeIsRunning) runModeLoop(); }, p);
             }
         }
 
         function toggleMode(m) {
-            if (currentMode === m) { stopGame(true); } 
-            else {
-                stopGame(true);
-                currentMode = m; modeIsRunning = true;
+            if (currentMode === m) { 
+                stopAudioCycles(); 
+                setHostLog("РЕЖИМ ВЫКЛЮЧЕН");
+            } else {
+                stopAudioCycles();
+                currentMode = m; 
+                modeIsRunning = true;
                 document.getElementById(m === 'normal' ? 'modeNormal' : 'modeHard').classList.add('btn-active');
                 setHostLog("РЕЖИМ: " + m.toUpperCase(), "#00ff41");
                 runModeLoop();
@@ -145,49 +162,32 @@
         function toggleNightmare() {
             const s = document.getElementById('snd-nightmare'), b = document.getElementById('nightBtn');
             if(s.paused) {
-                stopGame(false); // Остановить режимы, но не всё
+                stopAudioCycles();
                 s.play();
                 b.classList.add('active');
                 setHostLog("⚠️ NIGHTMARE АКТИВИРОВАН!", "#f0f");
                 if(recognition) try { recognition.start(); } catch(e){}
                 nightmareTimer = setTimeout(() => { if(!s.paused) triggerScream(); }, 10000);
             } else {
+                stopAudioCycles();
                 setHostLog("NIGHTMARE ПРЕРВАН");
-                stopGame(true);
             }
         }
 
         function triggerScream() {
-            stopGame(false); 
+            stopAudioCycles(); 
             const s = document.getElementById('snd-window');
             if(s) { s.currentTime = 0; s.play(); }
             if(conn) conn.send({ action: 'scream' });
             setHostLog("❌ ИГРОК УБИТ!", "#f00");
-        }
-
-        function stopGame(full = true) {
-            clearInterval(clockTimer);
-            modeIsRunning = false; currentMode = null;
-            document.getElementById('modeNormal').classList.remove('btn-active');
-            document.getElementById('modeHard').classList.remove('btn-active');
-            
-            const ns = document.getElementById('snd-nightmare');
-            ns.pause(); ns.currentTime = 0;
-            document.getElementById('nightBtn').classList.remove('active');
-            if(recognition) try { recognition.stop(); } catch(e){}
-
-            document.querySelectorAll('audio').forEach(a => {
-                if(full || (a.id !== 'snd-window' && a.id !== 'snd-win')) {
-                    a.pause(); a.currentTime = 0; a.onended = null;
-                }
-            });
-            if(full && conn) conn.send({ action: 'stop' });
+            clearInterval(clockTimer); // Смерть останавливает часы
         }
 
         function beginNight() {
             gameHour = 0;
             if(conn) conn.send({ action: 'start' });
-            startClock(); toggleSettings();
+            startClock(); 
+            toggleSettings();
             setHostLog("НОЧЬ НАЧАЛАСЬ");
         }
 
@@ -197,15 +197,19 @@
             clockTimer = setInterval(() => {
                 gameHour++;
                 if(conn) conn.send({ action: 'time', h: gameHour });
-                if(gameHour >= 6) { clearInterval(clockTimer); setTimeout(finishNight, 2500); }
+                if(gameHour >= 6) { 
+                    clearInterval(clockTimer); 
+                    setTimeout(finishNight, 2500); 
+                }
             }, ms);
         }
 
         function finishNight() {
+            stopAudioCycles();
             playSnd('win');
             if(conn) conn.send({ action: 'win' });
-            stopGame(false);
             setHostLog("🏆 ПОБЕДА: 6 УТРА!", "gold");
+            clearInterval(clockTimer);
         }
 
         function playSnd(n) { const s = document.getElementById('snd-'+n); if(s) { s.currentTime=0; s.play(); } }
@@ -217,13 +221,12 @@
             recognition.onresult = (e) => {
                 const text = e.results[e.results.length - 1][0].transcript.toLowerCase();
                 if (text.includes("иди вон") || text.includes("вон")) {
-                    setHostLog("ГОЛОС УСЛЫШАН: ИЗГНАНИЕ", "#00ff41");
-                    stopGame(true);
+                    setHostLog("ГОЛОС: ИЗГНАНИЕ", "#00ff41");
+                    stopAudioCycles();
                 }
             };
         }
 
-        // --- PLAYER ---
         function startAsPlayer() {
             document.getElementById('setupOverlay').style.display = 'none';
             document.getElementById('playerUI').style.display = 'flex';
@@ -235,11 +238,9 @@
                         c.on('data', data => {
                             const img = document.getElementById('screamImg');
                             const clk = document.getElementById('clock');
-                            const wait = document.getElementById('waitMsg');
                             if(data.action === 'start') {
                                 document.getElementById('winScreen').style.display = 'none';
-                                wait.style.display = 'none'; img.style.display = 'none'; 
-                                clk.style.display = 'block'; clk.innerText = "12:00";
+                                img.style.display = 'none'; clk.style.display = 'block'; clk.innerText = "12:00";
                             }
                             if(data.action === 'time') clk.innerText = data.h + ":00";
                             if(data.action === 'win') document.getElementById('winScreen').style.display = 'flex';
