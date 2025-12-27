@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Fnaf IRL v5.9</title>
+    <title>Fnaf IRL v6.0 Debug</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -20,13 +20,11 @@
         .btn { padding: 12px; background: #000; border: 1px solid #00ff41; color: #00ff41; cursor: pointer; font-family: inherit; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
         .btn:hover { background: rgba(0, 255, 65, 0.3); box-shadow: 0 0 10px #00ff41; }
         
-        /* Nightmare Кнопка */
         .btn-night.active { background: #f0f !important; color: #fff !important; border-color: #fff !important; box-shadow: 0 0 30px #f0f; animation: pulse 1s infinite; }
-        
         .btn-red { border-color: #f00; color: #f00; }
         .btn-red:hover { background: rgba(255, 0, 0, 0.3); box-shadow: 0 0 10px #f00; }
 
-        #hostStatusLog { margin-top: 15px; padding: 10px; border-top: 1px solid #1a1a1a; font-size: 0.9rem; text-align: center; }
+        #hostStatusLog { margin-top: 15px; padding: 10px; border-top: 1px solid #1a1a1a; font-size: 0.8rem; text-align: center; min-height: 20px; }
 
         /* ИНТЕРФЕЙС ИГРОКА */
         #playerUI { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; background: #000; }
@@ -69,11 +67,11 @@
         </div>
         <div id="hostStatusLog">READY</div>
 
-        <audio id="snd-door" src="door.mp3"></audio>
-        <audio id="snd-closet" src="closet.mp3"></audio>
-        <audio id="snd-window" src="window.mp3"></audio>
-        <audio id="snd-nightmare" src="nightmare.mp3" loop></audio>
-        <audio id="snd-win" src="win.mp3"></audio>
+        <audio id="snd-door" src="door.mp3" preload="auto"></audio>
+        <audio id="snd-closet" src="closet.mp3" preload="auto"></audio>
+        <audio id="snd-window" src="window.mp3" preload="auto" onerror="audioError('window')"></audio>
+        <audio id="snd-nightmare" src="nightmare.mp3" loop preload="auto"></audio>
+        <audio id="snd-win" src="win.mp3" preload="auto"></audio>
     </div>
 
     <div id="playerUI">
@@ -87,7 +85,13 @@
         const ROOM_ID = 'fnaf-irl-secure-room-v1';
         let peer, conn, gameHour = 0, clockTimer, autoTimer, nightmareTimer, recognition = null;
 
-        // --- ГОЛОС (ТОЛЬКО ХОСТ) ---
+        // --- ЛОГИРОВАНИЕ ОШИБОК АУДИО ---
+        function audioError(name) {
+            setHostLog("ОШИБКА ФАЙЛА: " + name + ".mp3 НЕ НАЙДЕН!", "#f00");
+            console.error("Audio failed to load: " + name);
+        }
+
+        // --- ГОЛОС ---
         function initVoice() {
             const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!Speech) return;
@@ -116,6 +120,13 @@
         function startAsHost() {
             document.getElementById('setupOverlay').style.display = 'none';
             document.getElementById('hostUI').style.display = 'block';
+            
+            // Прогрев аудио (разблокировка звука)
+            document.querySelectorAll('audio').forEach(a => { 
+                a.volume = 1.0; 
+                try { a.load(); } catch(e){}
+            });
+
             initVoice();
             peer = new Peer(ROOM_ID);
             peer.on('connection', c => {
@@ -127,8 +138,23 @@
         }
 
         function triggerScream() {
-            playSnd('window'); // Звук на Хосте
-            if(conn) conn.send({ action: 'scream' }); // Картинка Игроку
+            // Принудительный запуск звука с выводом ошибок
+            const s = document.getElementById('snd-window');
+            if(s) {
+                s.currentTime = 0;
+                var promise = s.play();
+                if (promise !== undefined) {
+                    promise.then(_ => {
+                        setHostLog("PLAYING SCREAM SOUND...", "gold");
+                    }).catch(error => {
+                        setHostLog("ERROR: " + error.message, "#f00");
+                    });
+                }
+            } else {
+                setHostLog("ERROR: AUDIO TAG MISSING", "#f00");
+            }
+
+            if(conn) conn.send({ action: 'scream' });
             setHostLog("PLAYER KILLED", "#f00");
             stopGame();
         }
@@ -136,7 +162,8 @@
         function toggleNightmare() {
             const s = document.getElementById('snd-nightmare'), b = document.getElementById('nightBtn');
             if(s.paused) {
-                s.play(); b.classList.add('active');
+                s.play().catch(e => setHostLog("ERR: NIGHTMARE SND " + e.message, "red"));
+                b.classList.add('active');
                 if(recognition) try { recognition.start(); } catch(e){}
                 setHostLog("NIGHTMARE! 10 SEC...", "#f0f");
                 nightmareTimer = setTimeout(() => {
@@ -180,7 +207,10 @@
 
         function playSnd(n) { 
             const s = document.getElementById('snd-'+n); 
-            if(s) { s.currentTime = 0; s.play(); }
+            if(s) { 
+                s.currentTime = 0; 
+                s.play().catch(e => setHostLog("ERR: " + n + " " + e.message, "red"));
+            }
         }
 
         function toggleMode(m) {
@@ -219,9 +249,9 @@
                             
                             if(data.action === 'start') {
                                 document.getElementById('winScreen').style.display = 'none';
-                                wait.style.display = 'none'; // Убираем ожидание
+                                wait.style.display = 'none'; 
                                 img.style.display = 'none'; 
-                                clk.style.display = 'block'; // Показываем часы
+                                clk.style.display = 'block'; 
                                 clk.innerText = "12:00";
                             }
                             
@@ -232,13 +262,7 @@
                                 img.src = "screamer.png?t=" + new Date().getTime();
                                 img.style.display = 'block';
                                 clk.style.display = 'none';
-                                // Через 3 секунды скример пропадет, но часы не вернутся (темный экран смерти)
                                 setTimeout(() => { img.style.display = 'none'; }, 3000);
-                            }
-                            
-                            if(data.action === 'stop') { 
-                                // При остановке ничего не делаем, просто часы замирают.
-                                // Если хост нажмет "Начать ночь", всё сбросится.
                             }
                         });
                     });
