@@ -2,49 +2,55 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Fnaf IRL v12.5 Final Stable</title>
+    <title>Fnaf IRL v13.0 Ultimate Stable</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        :root { --main: #00ff41; --red: #f00; --purple: #f0f; --brown: #8b4513; }
-        body { background: #000; color: var(--main); font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        :root { --green: #00ff41; --red: #ff3131; --brown: #8b4513; --purple: #f0f; }
+        body { background: #000; color: var(--green); font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
         
-        #setupOverlay { position: fixed; inset: 0; background: #000; z-index: 5000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; }
-        .start-btn { padding: 15px 30px; border: 2px solid var(--main); background: none; color: var(--main); font-family: inherit; font-size: 1.2rem; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
-        .start-btn:hover { background: var(--main); color: #000; box-shadow: 0 0 20px var(--main); }
+        /* Вход */
+        #setupOverlay { position: fixed; inset: 0; background: #000; z-index: 5000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; text-shadow: 0 0 10px var(--green); }
+        .start-btn { padding: 15px 30px; border: 2px solid var(--green); background: none; color: var(--green); font-size: 1.2rem; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
+        .start-btn:hover { background: var(--green); color: #000; box-shadow: 0 0 30px var(--green); }
 
-        .terminal { width: 600px; border: 2px solid #1a1a1a; padding: 20px; position: relative; display: none; background: #000; }
-        .settings-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; font-size: 1.5rem; z-index: 100; }
-        #settingsBox { display: none; background: #050505; border: 1px solid var(--main); padding: 15px; margin-bottom: 15px; }
+        /* Панель Хоста */
+        .terminal { width: 600px; border: 2px solid #1a1a1a; padding: 20px; display: none; background: #000; position: relative; border-radius: 10px; box-shadow: 0 0 20px rgba(0,255,65,0.05); }
+        .settings-btn { position: absolute; top: 15px; right: 15px; cursor: pointer; font-size: 1.5rem; opacity: 0.7; }
+        #settingsBox { display: none; background: #0a0a0a; border: 1px solid var(--green); padding: 15px; margin-bottom: 15px; border-radius: 5px; }
         
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .btn { padding: 12px; background: #000; border: 1px solid var(--main); color: var(--main); cursor: pointer; font-family: inherit; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
-        .btn:hover { background: rgba(0, 255, 65, 0.2); }
+        .btn { padding: 15px; background: #000; border: 1px solid var(--green); color: var(--green); cursor: pointer; font-family: inherit; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+        .btn:active { transform: scale(0.95); }
         
-        .btn-active { background: var(--main) !important; color: #000 !important; }
-        .btn-night.active { background: var(--purple) !important; color: #fff !important; box-shadow: 0 0 20px var(--purple); animation: pulse 1s infinite; }
-        .btn-freddy.active { background: var(--brown) !important; color: #fff !important; border-color: #fff !important; box-shadow: 0 0 20px var(--brown); }
+        /* Состояния кнопок */
+        .btn-active { background: var(--green) !important; color: #000 !important; box-shadow: 0 0 15px var(--green); }
+        .btn-night.active { background: var(--purple) !important; color: #fff !important; animation: pulse 1s infinite; border-color: #fff; }
+        .btn-freddy.active { background: var(--brown) !important; color: #fff !important; border-color: #fff; box-shadow: 0 0 20px var(--brown); }
         .btn-red { border-color: var(--red); color: var(--red); }
 
-        #hostStatusLog { margin-top: 15px; padding: 10px; border-top: 1px solid #1a1a1a; font-size: 0.8rem; text-align: center; }
+        #hostStatusLog { margin-top: 15px; padding: 10px; border-top: 1px solid #1a1a1a; font-size: 0.8rem; text-align: center; color: #555; }
 
-        /* PLAYER */
+        /* Игрок */
         #playerUI { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; }
-        #clock { font-size: 12rem; text-shadow: 0 0 30px var(--main); display: none; }
+        #clock { font-size: 10rem; text-shadow: 0 0 25px var(--green); display: none; font-weight: bold; }
         #flashBtn { 
-            display: none; position: fixed; bottom: 15%; width: 220px; height: 220px; border-radius: 50%; 
-            background: gold; border: 8px solid #fff; color: #000; font-weight: bold; font-size: 1.8rem; 
-            cursor: pointer; z-index: 8000; box-shadow: 0 0 40px gold;
+            display: none; position: fixed; bottom: 15%; width: 200px; height: 200px; border-radius: 50%; 
+            background: gold; border: 8px solid #fff; color: #000; font-weight: bold; font-size: 1.5rem; 
+            z-index: 8000; box-shadow: 0 0 40px gold; cursor: pointer; animation: shake 0.5s infinite;
         }
         #screamImg { display: none; position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 9999; }
-        #winScreen { display: none; position: fixed; inset: 0; background: #000; z-index: 10000; flex-direction: column; justify-content: center; align-items: center; }
+        #winScreen { display: none; position: fixed; inset: 0; background: #000; z-index: 10000; flex-direction: column; justify-content: center; align-items: center; color: gold; font-size: 8rem; text-shadow: 0 0 30px gold; }
 
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        /* Анимации */
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes shake { 0% { transform: translate(0,0); } 25% { transform: translate(2px,2px); } 50% { transform: translate(-2px, -2px); } 75% { transform: translate(2px, -2px); } }
     </style>
 </head>
 <body>
 
     <div id="setupOverlay">
-        <div style="font-size: 3rem; font-weight: bold;">Fnaf IRL</div>
+        <h1 style="font-size: 4rem; margin: 0;">FNAF IRL</h1>
+        <p style="margin-top: -10px; color: #333;">STABLE PERFORMANCE v13.0</p>
         <button class="start-btn" onclick="startHost()">ADMIN (HOST)</button>
         <button class="start-btn" onclick="startPlayer()">USER (PLAYER)</button>
     </div>
@@ -53,26 +59,25 @@
         <div class="settings-btn" onclick="toggleSettings()">⚙️</div>
         
         <div id="settingsBox">
-            <div style="margin-bottom: 10px;">ДЛИТЕЛЬНОСТЬ ЧАСА (сек): <input type="number" id="secInp" value="60" style="width:50px; background:#000; border:1px solid var(--main); color:var(--main);"></div>
-            <button class="btn" style="width: 100%; margin-bottom: 5px;" onclick="beginNight()">START NIGHT</button>
-            <button class="btn" style="width: 100%; border-color: gold; color: gold;" onclick="finishNight()">FINISH NIGHT (6 AM)</button>
+            <div style="margin-bottom: 10px;">ДЛИТЕЛЬНОСТЬ ЧАСА (СЕК): <input type="number" id="secInp" value="60" style="width:50px; background:#000; border:1px solid var(--green); color:var(--green); padding: 5px;"></div>
+            <button class="btn" style="width: 100%; margin-bottom: 5px; border-color: gold;" onclick="beginNight()">START NIGHT</button>
+            <button class="btn" style="width: 100%; border-color: #fff; color: #fff;" onclick="finishNight()">MANUAL WIN (6AM)</button>
         </div>
 
-        <div style="font-size: 0.8rem; margin-bottom: 10px;">STATUS: <span id="statusTxt" style="color:var(--red);">OFFLINE</span> | ID: fnaf-irl-v12</div>
+        <div style="font-size: 0.8rem; margin-bottom: 10px;">ID: <span style="color:white">fnaf-irl-main</span> | STATUS: <span id="stTxt" style="color:var(--red)">OFFLINE</span></div>
 
         <div class="grid">
             <button class="btn" onclick="playSnd('door')">STEPS</button>
             <button class="btn" onclick="playSnd('closet')">BREATH</button>
-            <button id="modeNormal" class="btn" onclick="toggleMode('normal')">NORMAL MODE</button>
-            <button id="modeHard" class="btn" onclick="toggleMode('hard')">HARD MODE</button>
-            <button id="nightBtn" class="btn btn-night" style="border-color:var(--purple); color:var(--purple);" onclick="toggleNightmare()">NIGHTMARE</button>
-            <button id="freddyBtn" class="btn btn-freddy" style="border-color:var(--brown); color:var(--brown);" onclick="triggerFreddy()">FREDDY (SND)</button>
-            <button class="btn btn-red" onclick="sendKill('default')">SCREAMER</button>
-            <button class="btn" style="border-color: gold; color: gold;" onclick="playSnd('flashlight')">TEST FLASH</button>
-            <button class="btn btn-red" style="grid-column: span 2;" onclick="stopEverything()">EMERGENCY STOP</button>
+            <button id="btn-normal" class="btn" onclick="toggleLoop('normal')">NORMAL MODE</button>
+            <button id="btn-hard" class="btn" onclick="toggleLoop('hard')">HARD MODE</button>
+            <button id="nightBtn" class="btn btn-night" onclick="toggleNightmare()">NIGHTMARE</button>
+            <button id="freddyBtn" class="btn btn-freddy" onclick="triggerFreddy()">FREDDY</button>
+            <button class="btn btn-red" onclick="sendKill()">SCREAMER</button>
+            <button class="btn" style="border-color: gold; color: gold;" onclick="playSnd('flashlight')">FLASH TEST</button>
+            <button class="btn btn-red" style="grid-column: span 2;" onclick="emergencyStop()">EMERGENCY STOP</button>
         </div>
-        
-        <div id="hostStatusLog">Ready. Connect Player.</div>
+        <div id="hostStatusLog">Ожидание игрока...</div>
 
         <audio id="snd-door" src="door.mp3"></audio>
         <audio id="snd-closet" src="closet.mp3"></audio>
@@ -87,43 +92,38 @@
         <div id="clock">12:00</div>
         <button id="flashBtn" onclick="playerFlash()">LIGHT!</button>
         <img id="screamImg" src="">
-        <div id="winScreen"><div style="font-size:10rem;">👑</div><div style="color: gold; font-size: 4rem;">6 AM</div></div>
+        <div id="winScreen">6 AM</div>
     </div>
 
     <script>
-        const ROOM_ID = 'fnaf-irl-v12-stable-id';
-        let peer, conn, gameHour = 0, clockTimer, modeRunning = false, currentMode = null;
-        let nightmareTimer = null, freddyTimer = null;
+        const ROOM_ID = 'fnaf-irl-stable-65';
+        let peer, conn, clockTimer, gameHour = 0, loopActive = false, currentLoopMode = '';
 
-        function log(m, c="#00ff41") { const l = document.getElementById('hostStatusLog'); l.innerText = m; l.style.color = c; }
+        function log(m, c) { const l = document.getElementById('hostStatusLog'); l.innerText = m; if(c) l.style.color = c; }
         function toggleSettings() { const s = document.getElementById('settingsBox'); s.style.display = s.style.display === 'block' ? 'none' : 'block'; }
-        
-        function playSnd(n) { 
-            const a = document.getElementById('snd-' + n); 
-            if(a) { a.currentTime = 0; a.play().catch(()=>{}); } 
-        }
+        function playSnd(n) { const a = document.getElementById('snd-'+n); if(a) { a.currentTime=0; a.play().catch(()=>{}); } }
 
         // HOST
         function startHost() {
             document.getElementById('setupOverlay').style.display = 'none';
             document.getElementById('hostUI').style.display = 'block';
             peer = new Peer(ROOM_ID);
-            peer.on('open', () => log("WAITING FOR PLAYER..."));
+            peer.on('open', () => log("СЕРВЕР ГОТОВ. ЖДЕМ ИГРОКА."));
             peer.on('connection', c => {
                 conn = c;
-                document.getElementById('statusTxt').innerText = "ONLINE";
-                document.getElementById('statusTxt').style.color = "var(--main)";
-                log("PLAYER CONNECTED!");
-                conn.on('data', d => { if(d === 'f_ok') { playSnd('flashlight'); stopFreddyVisual(); } });
+                document.getElementById('stTxt').innerText = "ONLINE";
+                document.getElementById('stTxt').style.color = "var(--green)";
+                log("ИГРОК ПОДКЛЮЧЕН!");
+                conn.on('data', d => { if(d === 'f_ok') { playSnd('flashlight'); document.getElementById('freddyBtn').classList.remove('active'); } });
             });
         }
 
         function beginNight() {
             gameHour = 0;
-            if(conn) conn.send({ action: 'start' });
+            if(conn) conn.send({ a: 'start' });
             startClock();
-            if(document.getElementById('settingsBox').style.display === 'block') toggleSettings();
-            log("NIGHT STARTED");
+            toggleSettings();
+            log("НОЧЬ НАЧАЛАСЬ", "var(--green)");
         }
 
         function startClock() {
@@ -131,78 +131,58 @@
             const sec = parseInt(document.getElementById('secInp').value) || 60;
             clockTimer = setInterval(() => {
                 gameHour++;
-                if(conn) conn.send({ action: 'time', h: gameHour });
+                if(conn) conn.send({ a: 'time', h: gameHour });
                 if(gameHour >= 6) finishNight();
             }, sec * 1000);
         }
 
-        function finishNight() {
-            playSnd('win');
-            if(conn) conn.send({ action: 'win' });
-            clearInterval(clockTimer);
-            stopEverything();
-            log("6 AM! WIN", "gold");
-        }
-
         function triggerFreddy() {
-            stopCycles();
-            document.getElementById('freddyBtn').classList.add('active');
             playSnd('freddy');
-            if(conn) conn.send({ action: 'freddy' });
-            log("FREDDY ATTACK", "#8b4513");
+            document.getElementById('freddyBtn').classList.add('active');
+            if(conn) conn.send({ a: 'freddy' });
         }
 
-        function stopFreddyVisual() {
-            document.getElementById('freddyBtn').classList.remove('active');
-        }
-
-        function toggleMode(m) {
-            if(currentMode === m) { stopCycles(); }
+        function toggleLoop(mode) {
+            if(currentLoopMode === mode) { loopActive = false; currentLoopMode = ''; } 
             else {
-                stopCycles();
-                currentMode = m; modeRunning = true;
-                document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1)).classList.add('btn-active');
-                runLoop();
+                loopActive = true; currentLoopMode = mode;
+                document.querySelectorAll('.btn').forEach(b => b.classList.remove('btn-active'));
+                document.getElementById('btn-'+mode).classList.add('btn-active');
+                const run = () => {
+                    if(!loopActive || currentLoopMode !== mode) return;
+                    playSnd(Math.random() > 0.5 ? 'door' : 'closet');
+                    setTimeout(run, mode === 'normal' ? 5000 : 2500);
+                };
+                run();
             }
-        }
-
-        function runLoop() {
-            if(!modeRunning) return;
-            playSnd(Math.random() > 0.5 ? 'door' : 'closet');
-            setTimeout(runLoop, currentMode === 'normal' ? 5000 : 2500);
         }
 
         function toggleNightmare() {
             const b = document.getElementById('nightBtn');
-            if(b.classList.contains('active')) { stopCycles(); }
-            else {
-                stopCycles();
-                b.classList.add('active');
-                playSnd('nightmare');
-                nightmareTimer = setTimeout(() => { if(b.classList.contains('active')) sendKill('nightmare'); }, 12000);
-            }
+            b.classList.toggle('active');
+            if(b.classList.contains('active')) playSnd('nightmare'); 
+            else { document.getElementById('snd-nightmare').pause(); document.getElementById('snd-nightmare').currentTime = 0; }
         }
 
-        function sendKill(t) {
-            stopCycles();
+        function sendKill() {
             playSnd('window');
-            if(conn) conn.send({ action: 'kill', type: t });
-            clearInterval(clockTimer);
-            log("PLAYER KILLED", "red");
+            if(conn) conn.send({ a: 'kill' });
+            emergencyStop();
         }
 
-        function stopEverything() {
-            clearInterval(clockTimer);
-            stopCycles();
-            if(conn) conn.send({ action: 'stop' });
-            log("STOPPED", "red");
+        function finishNight() {
+            playSnd('win');
+            if(conn) conn.send({ a: 'win' });
+            emergencyStop();
         }
 
-        function stopCycles() {
-            modeRunning = false; currentMode = null;
-            clearTimeout(nightmareTimer);
+        function emergencyStop() {
+            clearInterval(clockTimer);
+            loopActive = false; currentLoopMode = '';
             document.querySelectorAll('.btn').forEach(b => b.classList.remove('btn-active', 'active'));
             document.querySelectorAll('audio').forEach(a => { if(a.id !== 'snd-win') { a.pause(); a.currentTime = 0; } });
+            if(conn) conn.send({ a: 'stop' });
+            log("ОСТАНОВЛЕНО", "var(--red)");
         }
 
         // PLAYER
@@ -218,31 +198,18 @@
                             const clk = document.getElementById('clock');
                             const fl = document.getElementById('flashBtn');
                             const img = document.getElementById('screamImg');
-                            const win = document.getElementById('winScreen');
-                            
-                            if(d.action === 'start') {
+                            if(d.a === 'start') {
                                 clk.style.display = 'block'; clk.innerText = "12:00";
-                                img.style.display = 'none'; win.style.display = 'none';
+                                img.style.display = 'none'; document.getElementById('winScreen').style.display = 'none';
                             }
-                            if(d.action === 'time') clk.innerText = d.h + ":00";
-                            if(d.action === 'freddy') {
-                                fl.style.display = 'block';
-                                freddyTimer = setTimeout(() => {
-                                    if(fl.style.display === 'block') {
-                                        fl.style.display = 'none';
-                                        img.src = 'freddy.png'; img.style.display = 'block';
-                                    }
-                                }, 10000);
-                            }
-                            if(d.action === 'kill') {
-                                img.src = d.type === 'nightmare' ? 'nightmare.png' : 'screamer.png';
-                                img.style.display = 'block'; clk.style.display = 'none';
-                            }
-                            if(d.action === 'win') win.style.display = 'flex';
-                            if(d.action === 'stop') { fl.style.display = 'none'; clearTimeout(freddyTimer); }
+                            if(d.a === 'time') clk.innerText = d.h + ":00";
+                            if(d.a === 'freddy') fl.style.display = 'block';
+                            if(d.a === 'kill') { img.style.display = 'block'; img.src = "screamer.png"; }
+                            if(d.a === 'win') document.getElementById('winScreen').style.display = 'flex';
+                            if(d.a === 'stop') fl.style.display = 'none';
                         });
                     });
-                    c.on('error', () => setTimeout(connect, 3000));
+                    c.on('error', () => setTimeout(connect, 2000));
                 };
                 connect();
             });
@@ -250,8 +217,7 @@
 
         function playerFlash() {
             document.getElementById('flashBtn').style.display = 'none';
-            clearTimeout(freddyTimer);
-            if(conn) conn.send('f_ok');
+            if(peer.connections[ROOM_ID]) peer.connections[ROOM_ID][0].send('f_ok');
             document.body.style.background = "#fff";
             setTimeout(() => document.body.style.background = "#000", 100);
         }
