@@ -2,114 +2,152 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Fnaf IRL v6.5 Performance</title>
+    <title>Fnaf IRL v7.0 Final Stable</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { background: #000; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        #setupOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 5000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; }
-        .start-btn { padding: 15px 30px; border: 2px solid #00ff41; background: none; color: #00ff41; font-family: inherit; font-size: 1.2rem; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
-        .start-btn:hover { background: #00ff41; color: #000; box-shadow: 0 0 20px #00ff41; }
-        .terminal { width: 600px; border: 2px solid #1a1a1a; padding: 20px; position: relative; display: none; background: #000; z-index: 10; }
-        .settings-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; font-size: 1.5rem; z-index: 20; }
-        #settingsBox { display: none; background: #050505; border: 1px solid #00ff41; padding: 15px; margin-bottom: 15px; }
+        :root { --neon-green: #00ff41; --neon-red: #f00; --neon-purple: #f0f; }
+        body { background: #000; color: var(--neon-green); font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
+        /* UI Elements */
+        .terminal { width: 600px; border: 2px solid #1a1a1a; padding: 20px; position: relative; display: none; background: #000; box-shadow: 0 0 20px rgba(0,255,65,0.1); }
+        #setupOverlay { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; }
+        
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .btn { padding: 12px; background: #000; border: 1px solid #00ff41; color: #00ff41; cursor: pointer; font-family: inherit; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
-        .btn:hover { background: rgba(0, 255, 65, 0.3); }
-        .btn-active { background: #00ff41 !important; color: #000 !important; }
-        .btn-night.active { background: #f0f !important; color: #fff !important; border-color: #fff !important; box-shadow: 0 0 30px #f0f; animation: pulse 1s infinite; }
-        .btn-red { border-color: #f00; color: #f00; }
-        #hostStatusLog { margin-top: 15px; padding: 10px; border-top: 1px solid #1a1a1a; font-size: 0.8rem; text-align: center; min-height: 1.2rem; }
-        #playerUI { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; background: #000; }
-        #clock { font-size: 12rem; text-shadow: 0 0 30px #00ff41; display: none; }
-        #screamImg { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 99999; }
-        #winScreen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; flex-direction: column; justify-content: center; align-items: center; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .btn { padding: 12px; background: none; border: 1px solid var(--neon-green); color: var(--neon-green); cursor: pointer; font-family: inherit; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+        .btn:hover { background: rgba(0, 255, 65, 0.2); }
+        .btn-active { background: var(--neon-green) !important; color: #000 !important; }
+        .btn-night.active { background: var(--neon-purple) !important; color: #fff !important; box-shadow: 0 0 20px var(--neon-purple); animation: blink 1s infinite; }
+        .btn-red { border-color: var(--neon-red); color: var(--neon-red); }
+        
+        #hostStatusLog { margin-top: 15px; padding: 8px; border-top: 1px solid #222; font-size: 0.8rem; text-align: center; color: #666; }
+        #clock { font-size: 12rem; text-shadow: 0 0 30px var(--neon-green); display: none; }
+        #screamImg { display: none; position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1000; }
+        #winScreen { display: none; position: fixed; inset: 0; background: #000; z-index: 1100; flex-direction: column; justify-content: center; align-items: center; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
 
     <div id="setupOverlay">
-        <div style="font-size: 3rem; font-weight: bold;">Fnaf IRL</div>
-        <button class="start-btn" onclick="startAsHost()">ADMIN (HOST)</button>
-        <button class="start-btn" onclick="startAsPlayer()">USER (PLAYER)</button>
+        <h1 style="font-size: 4rem; margin: 0;">FNAF IRL</h1>
+        <button class="btn" style="padding: 20px 50px;" onclick="initRole('host')">АДМИН (HOST)</button>
+        <button class="btn" style="padding: 20px 50px;" onclick="initRole('player')">ИГРОК (PLAYER)</button>
     </div>
 
     <div id="hostUI" class="terminal">
-        <div class="settings-btn" onclick="toggleSettings()">⚙️</div>
-        <div id="settingsBox">
-            <div style="margin-bottom: 10px;">ЧАС: <input type="number" id="minInput" value="1" style="width:40px;"> м. <input type="number" id="secInput" value="30" style="width:40px;"> с.</div>
-            <button class="btn" style="width: 100%; margin-bottom: 5px;" onclick="beginNight()">START NIGHT</button>
-            <button class="btn" style="width: 100%; border-color: gold; color: gold;" onclick="finishNight()">MANUAL WIN</button>
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <span>STATUS: <b id="statusTxt" style="color:var(--neon-red)">OFFLINE</b></span>
+            <button class="btn" style="padding: 2px 10px;" onclick="toggleSettings()">⚙️</button>
         </div>
 
-        <div style="font-size: 0.8rem; margin-bottom: 10px;">STATUS: <span id="statusTxt" style="color:#f00;">CONNECTING...</span></div>
+        <div id="settingsBox" style="display:none; border: 1px solid #333; padding: 10px; margin-bottom: 10px;">
+            ЧАС: <input type="number" id="mInp" value="1" style="width:35px">м <input type="number" id="sInp" value="30" style="width:35px">с
+            <button class="btn" style="float:right" onclick="beginNight()">START NIGHT</button>
+        </div>
 
         <div class="grid">
             <button class="btn" onclick="playSnd('door')">STEPS</button>
             <button class="btn" onclick="playSnd('closet')">BREATH</button>
-            <button id="modeNormal" class="btn" onclick="toggleMode('normal')">NORMAL MODE</button>
-            <button id="modeHard" class="btn" onclick="toggleMode('hard')">HARD MODE</button>
-            <button id="nightBtn" class="btn btn-night" style="border-color:#f0f; color:#f0f;" onclick="toggleNightmare()">NIGHTMARE</button>
+            <button id="btn-normal" class="btn" onclick="setMode('normal')">NORMAL MODE</button>
+            <button id="btn-hard" class="btn" onclick="setMode('hard')">HARD MODE</button>
+            <button id="nightBtn" class="btn btn-night" onclick="toggleNightmare()">NIGHTMARE</button>
             <button class="btn btn-red" onclick="triggerScream()">SCREAMER</button>
-            <button class="btn btn-red" style="grid-column: span 2;" onclick="stopGame()">EMERGENCY STOP</button>
+            <button class="btn btn-red" style="grid-column: span 2" onclick="fullStop()">EMERGENCY STOP</button>
         </div>
-        <div id="hostStatusLog">ID: fnaf-irl-room-v6</div>
-
-        <audio id="snd-door" src="door.mp3" preload="auto"></audio>
-        <audio id="snd-closet" src="closet.mp3" preload="auto"></audio>
-        <audio id="snd-window" src="window.mp3" preload="auto"></audio>
-        <audio id="snd-nightmare" src="nightmare.mp3" loop preload="auto"></audio>
-        <audio id="snd-win" src="win.mp3" preload="auto"></audio>
+        <div id="hostStatusLog">ID: fnaf-irl-room-v7</div>
     </div>
 
-    <div id="playerUI">
+    <div id="playerUI" style="display:none; flex-direction: column; align-items: center;">
+        <div id="waitMsg" style="font-size: 1.5rem; color: #333;">WAITING FOR HOST...</div>
         <div id="clock">12:00</div>
         <img id="screamImg" src="screamer.png">
-        <div id="winScreen"><div style="font-size:15rem;">👑</div><div style="color: gold; font-size: 4rem;">6 AM</div></div>
+        <div id="winScreen"><div style="font-size:10rem">👑</div><div style="font-size:4rem; color: gold;">6 AM</div></div>
     </div>
 
-    <script>
-        const ROOM_ID = 'fnaf-irl-room-v6';
-        let peer, conn, gameHour = 0, clockTimer, recognition = null;
-        let currentMode = null, lastSound = null, modeIsRunning = false;
-        let nightmareTimer = null;
+    <audio id="snd-door" src="door.mp3" preload="auto"></audio>
+    <audio id="snd-closet" src="closet.mp3" preload="auto"></audio>
+    <audio id="snd-window" src="window.mp3" preload="auto"></audio>
+    <audio id="snd-nightmare" src="nightmare.mp3" loop preload="auto"></audio>
+    <audio id="snd-win" src="win.mp3" preload="auto"></audio>
 
-        function setHostLog(msg, color="#00ff41") {
-            const log = document.getElementById('hostStatusLog');
-            if(log) { log.innerText = msg; log.style.color = color; }
+    <script>
+        const CONFIG = { roomId: 'fnaf-irl-room-v7', nTime: 10000, winDelay: 2500 };
+        let peer, conn, clockInt, gameHour = 0;
+        let activeMode = null, lastSnd = null, loopActive = false;
+
+        function setHostLog(m, c = 'var(--neon-green)') {
+            const l = document.getElementById('hostStatusLog');
+            l.innerText = m; l.style.color = c;
         }
 
         function toggleSettings() {
             const s = document.getElementById('settingsBox');
-            s.style.display = s.style.display === 'block' ? 'none' : 'block';
+            s.style.display = s.style.display === 'none' ? 'block' : 'none';
         }
 
-        function startAsHost() {
+        // --- CORE LOGIC ---
+        function initRole(role) {
             document.getElementById('setupOverlay').style.display = 'none';
-            document.getElementById('hostUI').style.display = 'block';
-            initVoice();
-            peer = new Peer(ROOM_ID);
-            peer.on('open', id => setHostLog("ЖДУ ИГРОКА (ID: " + id + ")"));
-            peer.on('connection', c => {
-                conn = c;
-                document.getElementById('statusTxt').innerText = "PLAYER CONNECTED";
-                document.getElementById('statusTxt').style.color = "#00ff41";
-                setHostLog("ИГРОК ПОДКЛЮЧЕН", "#00ff41");
-            });
+            if(role === 'host') {
+                document.getElementById('hostUI').style.display = 'block';
+                peer = new Peer(CONFIG.roomId);
+                peer.on('open', id => setHostLog("ЖДУ ИГРОКА... ID: " + id));
+                peer.on('connection', c => {
+                    conn = c;
+                    document.getElementById('statusTxt').innerText = "ONLINE";
+                    document.getElementById('statusTxt').style.color = "var(--neon-green)";
+                    setHostLog("ИГРОК ПОДКЛЮЧЕН!");
+                });
+            } else {
+                document.getElementById('playerUI').style.display = 'flex';
+                peer = new Peer();
+                peer.on('open', () => {
+                    const connect = () => {
+                        const c = peer.connect(CONFIG.roomId);
+                        c.on('open', () => handlePlayerData(c));
+                        c.on('error', () => setTimeout(connect, 3000));
+                    };
+                    connect();
+                });
+            }
         }
 
-        // --- ТОЛЬКО ОСТАНОВКА ЗВУКОВЫХ ЦИКЛОВ (БЕЗ ЧАСОВ) ---
-        function stopAudioCycles() {
-            modeIsRunning = false;
-            currentMode = null;
-            document.getElementById('modeNormal').classList.remove('btn-active');
-            document.getElementById('modeHard').classList.remove('btn-active');
-            
-            clearTimeout(nightmareTimer);
-            const ns = document.getElementById('snd-nightmare');
-            ns.pause(); ns.currentTime = 0;
+        async function audioLoop() {
+            if(!loopActive) return;
+            const pool = ['door', 'closet'];
+            let next;
+            do { next = pool[Math.floor(Math.random()*pool.length)]; } while(next === lastSnd);
+            lastSnd = next;
+
+            const a = document.getElementById('snd-'+next);
+            await new Promise(r => { 
+                a.currentTime = 0; a.play(); 
+                a.onended = r; 
+            });
+
+            if(loopActive) {
+                let d = activeMode === 'normal' ? (Math.random()*2000 + 2000) : 1000;
+                setTimeout(() => { if(loopActive) audioLoop(); }, d);
+            }
+        }
+
+        function setMode(m) {
+            if(activeMode === m) { stopSounds(); return; }
+            stopSounds();
+            activeMode = m; loopActive = true;
+            document.getElementById('btn-'+m).classList.add('btn-active');
+            setHostLog("РЕЖИМ: " + m.toUpperCase());
+            audioLoop();
+        }
+
+        function stopSounds() {
+            loopActive = false; activeMode = null;
+            document.getElementById('btn-normal').classList.remove('btn-active');
+            document.getElementById('btn-hard').classList.remove('btn-active');
             document.getElementById('nightBtn').classList.remove('active');
-            
+            const nm = document.getElementById('snd-nightmare');
+            nm.pause(); nm.currentTime = 0;
             document.querySelectorAll('audio').forEach(a => {
                 if(a.id !== 'snd-window' && a.id !== 'snd-win') {
                     a.pause(); a.currentTime = 0; a.onended = null;
@@ -117,143 +155,60 @@
             });
         }
 
-        // --- ПОЛНАЯ ОСТАНОВКА ИГРЫ (ВКЛЮЧАЯ ЧАСЫ) ---
-        function stopGame() {
-            clearInterval(clockTimer);
-            stopAudioCycles();
-            if(conn) conn.send({ action: 'stop' });
-            setHostLog("ИГРА ОСТАНОВЛЕНА", "red");
-        }
-
-        async function runModeLoop() {
-            if (!modeIsRunning) return;
-            const sounds = ['door', 'closet'];
-            let nextSnd;
-            do { nextSnd = sounds[Math.floor(Math.random() * sounds.length)]; } while (nextSnd === lastSound);
-            lastSound = nextSnd;
-            const audio = document.getElementById('snd-' + nextSnd);
-            
-            await new Promise(res => {
-                audio.currentTime = 0;
-                audio.play();
-                audio.onended = res;
-            });
-
-            if (modeIsRunning) {
-                let p = currentMode === 'normal' ? (Math.random() * 2000 + 2000) : 1000;
-                setTimeout(() => { if(modeIsRunning) runModeLoop(); }, p);
-            }
-        }
-
-        function toggleMode(m) {
-            if (currentMode === m) { 
-                stopAudioCycles(); 
-                setHostLog("РЕЖИМ ВЫКЛЮЧЕН");
-            } else {
-                stopAudioCycles();
-                currentMode = m; 
-                modeIsRunning = true;
-                document.getElementById(m === 'normal' ? 'modeNormal' : 'modeHard').classList.add('btn-active');
-                setHostLog("РЕЖИМ: " + m.toUpperCase(), "#00ff41");
-                runModeLoop();
-            }
-        }
-
         function toggleNightmare() {
             const s = document.getElementById('snd-nightmare'), b = document.getElementById('nightBtn');
             if(s.paused) {
-                stopAudioCycles();
-                s.play();
-                b.classList.add('active');
-                setHostLog("⚠️ NIGHTMARE АКТИВИРОВАН!", "#f0f");
-                if(recognition) try { recognition.start(); } catch(e){}
-                nightmareTimer = setTimeout(() => { if(!s.paused) triggerScream(); }, 10000);
-            } else {
-                stopAudioCycles();
-                setHostLog("NIGHTMARE ПРЕРВАН");
-            }
+                stopSounds();
+                s.play(); b.classList.add('active');
+                setHostLog("NIGHTMARE АКТИВИРОВАН!", "var(--neon-purple)");
+                setTimeout(() => { if(!s.paused) triggerScream(); }, CONFIG.nTime);
+            } else { stopSounds(); }
         }
 
         function triggerScream() {
-            stopAudioCycles(); 
+            stopSounds(); clearInterval(clockInt);
             const s = document.getElementById('snd-window');
-            if(s) { s.currentTime = 0; s.play(); }
+            s.currentTime = 0; s.play();
             if(conn) conn.send({ action: 'scream' });
-            setHostLog("❌ ИГРОК УБИТ!", "#f00");
-            clearInterval(clockTimer); // Смерть останавливает часы
+            setHostLog("ИГРОК УБИТ", "var(--neon-red)");
         }
 
         function beginNight() {
-            gameHour = 0;
+            gameHour = 0; toggleSettings();
             if(conn) conn.send({ action: 'start' });
-            startClock(); 
-            toggleSettings();
+            startClock();
             setHostLog("НОЧЬ НАЧАЛАСЬ");
         }
 
         function startClock() {
-            clearInterval(clockTimer);
-            const ms = ((parseInt(document.getElementById('minInput').value)||0)*60 + (parseInt(document.getElementById('secInput').value)||0))*1000;
-            clockTimer = setInterval(() => {
+            clearInterval(clockInt);
+            const ms = ((parseInt(document.getElementById('mInp').value)||0)*60 + (parseInt(document.getElementById('sInp').value)||0))*1000;
+            clockInt = setInterval(() => {
                 gameHour++;
                 if(conn) conn.send({ action: 'time', h: gameHour });
-                if(gameHour >= 6) { 
-                    clearInterval(clockTimer); 
-                    setTimeout(finishNight, 2500); 
-                }
+                if(gameHour >= 6) { clearInterval(clockInt); setTimeout(victory, CONFIG.winDelay); }
             }, ms);
         }
 
-        function finishNight() {
-            stopAudioCycles();
-            playSnd('win');
+        function victory() {
+            stopSounds();
+            document.getElementById('snd-win').play();
             if(conn) conn.send({ action: 'win' });
-            setHostLog("🏆 ПОБЕДА: 6 УТРА!", "gold");
-            clearInterval(clockTimer);
+            setHostLog("ПОБЕДА: 6 УТРА!", "gold");
         }
 
-        function playSnd(n) { const s = document.getElementById('snd-'+n); if(s) { s.currentTime=0; s.play(); } }
+        function fullStop() { stopSounds(); clearInterval(clockInt); if(conn) conn.send({ action: 'stop' }); setHostLog("STOPPED"); }
+        function playSnd(n) { const a = document.getElementById('snd-'+n); a.currentTime=0; a.play(); }
 
-        function initVoice() {
-            const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!Speech) return;
-            recognition = new Speech(); recognition.lang = 'ru-RU'; recognition.continuous = true;
-            recognition.onresult = (e) => {
-                const text = e.results[e.results.length - 1][0].transcript.toLowerCase();
-                if (text.includes("иди вон") || text.includes("вон")) {
-                    setHostLog("ГОЛОС: ИЗГНАНИЕ", "#00ff41");
-                    stopAudioCycles();
-                }
-            };
-        }
-
-        function startAsPlayer() {
-            document.getElementById('setupOverlay').style.display = 'none';
-            document.getElementById('playerUI').style.display = 'flex';
-            peer = new Peer();
-            peer.on('open', () => {
-                const connect = () => {
-                    const c = peer.connect(ROOM_ID);
-                    c.on('open', () => {
-                        c.on('data', data => {
-                            const img = document.getElementById('screamImg');
-                            const clk = document.getElementById('clock');
-                            if(data.action === 'start') {
-                                document.getElementById('winScreen').style.display = 'none';
-                                img.style.display = 'none'; clk.style.display = 'block'; clk.innerText = "12:00";
-                            }
-                            if(data.action === 'time') clk.innerText = data.h + ":00";
-                            if(data.action === 'win') document.getElementById('winScreen').style.display = 'flex';
-                            if(data.action === 'scream') {
-                                img.src = "screamer.png?t=" + Date.now();
-                                img.style.display = 'block'; clk.style.display = 'none';
-                                setTimeout(() => img.style.display = 'none', 4000);
-                            }
-                        });
-                    });
-                    c.on('error', () => setTimeout(connect, 3000));
-                };
-                connect();
+        // --- PLAYER DATA HANDLER ---
+        function handlePlayerData(c) {
+            c.on('data', d => {
+                const img = document.getElementById('screamImg'), clk = document.getElementById('clock'), win = document.getElementById('winScreen'), wait = document.getElementById('waitMsg');
+                if(d.action === 'start') { win.style.display='none'; img.style.display='none'; clk.style.display='block'; wait.style.display='none'; clk.innerText="12:00"; }
+                if(d.action === 'time') clk.innerText = d.h + ":00";
+                if(d.action === 'win') win.style.display='flex';
+                if(d.action === 'scream') { img.src="screamer.png?t="+Date.now(); img.style.display='block'; clk.style.display='none'; setTimeout(()=>img.style.display='none', 4000); }
+                if(d.action === 'stop') { clk.style.display='none'; wait.style.display='block'; }
             });
         }
     </script>
