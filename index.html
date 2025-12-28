@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Fnaf IRL v7.2 Fix</title>
+    <title>Fnaf IRL v7.3 Final Fix</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -17,7 +17,7 @@
         .btn-active { background: #00ff41 !important; color: #000 !important; }
         .btn-night.active { background: #f0f !important; color: #fff !important; box-shadow: 0 0 30px #f0f; }
         .btn-red { border-color: #f00; color: #f00; }
-        #hostStatusLog { margin-top: 15px; padding: 10px; border-top: 1px solid #1a1a1a; font-size: 0.8rem; text-align: center; }
+        #hostStatusLog { margin-top: 15px; padding: 10px; border-top: 1px solid #1a1a1a; font-size: 0.9rem; text-align: center; color: yellow; }
         #playerUI { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; background: #000; }
         #clock { font-size: 12rem; text-shadow: 0 0 30px #00ff41; display: none; }
         #screamImg { display: none; position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 99999; }
@@ -27,17 +27,16 @@
 <body>
 
     <div id="setupOverlay">
-        <div style="font-size: 3rem; font-weight: bold;">Fnaf IRL</div>
-        <button class="start-btn" onclick="initRole('host')">ADMIN (HOST)</button>
-        <button class="start-btn" onclick="initRole('player')">USER (PLAYER)</button>
+        <div style="font-size: 3rem; font-weight: bold; margin-bottom: 10px;">FNAF IRL v7.3</div>
+        <button class="start-btn" onclick="initHost()">СОЗДАТЬ ИГРУ (HOST)</button>
+        <button class="start-btn" onclick="initPlayer()">ВОЙТИ В ИГРУ (PLAYER)</button>
     </div>
 
     <div id="hostUI" class="terminal">
         <div class="settings-btn" onclick="toggleSettings()">⚙️</div>
         <div id="settingsBox">
             <div style="margin-bottom: 10px;">
-                ДЛИТЕЛЬНОСТЬ ЧАСА: 
-                <input type="number" id="minInput" value="1" style="width:40px;"> м. 
+                ЧАС: <input type="number" id="minInput" value="1" style="width:40px;"> м. 
                 <input type="number" id="secInput" value="30" style="width:40px;"> с.
             </div>
             <button class="btn" style="width: 100%; margin-bottom: 5px;" onclick="beginNight()">START NIGHT</button>
@@ -53,124 +52,164 @@
             <button class="btn btn-red" onclick="triggerScream()">SCREAMER</button>
             <button class="btn btn-red" style="grid-column: span 2;" onclick="fullStop()">EMERGENCY STOP</button>
         </div>
-        <div id="hostStatusLog">Инициализация...</div>
-        <audio id="snd-door" src="door.mp3"></audio>
-        <audio id="snd-closet" src="closet.mp3"></audio>
-        <audio id="snd-window" src="window.mp3"></audio>
-        <audio id="snd-nightmare" src="nightmare.mp3" loop></audio>
-        <audio id="snd-win" src="win.mp3"></audio>
+        <div id="hostStatusLog">Инициализация сети...</div>
     </div>
 
     <div id="playerUI">
-        <div id="waitMsg" style="font-size: 2rem; color: #444;">ОЖИДАНИЕ ХОСТА...</div>
+        <div id="playerStatus" style="color: #00ff41; margin-bottom: 20px;">ОЖИДАНИЕ ХОСТА...</div>
         <div id="clock">12:00</div>
         <img id="screamImg" src="screamer.png">
         <div id="winScreen"><div style="font-size:15rem;">👑</div><div style="color: gold; font-size: 4rem;">6 AM</div></div>
     </div>
 
-    <script>
-        // Генерируем уникальный ID для каждой сессии
-        const SESSION_ID = 'fnaf-irl-' + Math.floor(Math.random() * 9000 + 1000);
-        let peer, conn, gameHour = 0, clockTimer;
-        let activeMode = null, modeIsRunning = false;
+    <audio id="snd-door" src="door.mp3"></audio>
+    <audio id="snd-closet" src="closet.mp3"></audio>
+    <audio id="snd-window" src="window.mp3"></audio>
+    <audio id="snd-nightmare" src="nightmare.mp3" loop></audio>
+    <audio id="snd-win" src="win.mp3"></audio>
 
-        function setHostLog(msg, color="#00ff41") {
-            const log = document.getElementById('hostStatusLog');
-            log.innerText = msg; log.style.color = color;
-        }
+    <script>
+        let peer, conn, gameHour = 0, clockTimer, activeMode = null, modeIsRunning = false;
 
         function toggleSettings() {
             const s = document.getElementById('settingsBox');
             s.style.display = s.style.display === 'block' ? 'none' : 'block';
         }
 
-        function initRole(role) {
+        // --- HOST LOGIC ---
+        function initHost() {
             document.getElementById('setupOverlay').style.display = 'none';
-            if(role === 'host') {
-                document.getElementById('hostUI').style.display = 'block';
-                // Хост всегда использует SESSION_ID
-                peer = new Peer(SESSION_ID);
-                peer.on('open', id => setHostLog("ВАШ ID: " + id + " (ПЕРЕДАЙТЕ ИГРОКУ)"));
-                peer.on('connection', c => {
-                    conn = c;
-                    document.getElementById('statusTxt').innerText = "ONLINE";
-                    document.getElementById('statusTxt').style.color = "#00ff41";
-                    setHostLog("ИГРОК ПОДКЛЮЧИЛСЯ!");
-                    // Подтверждаем связь игроку
-                    setTimeout(() => { if(conn) conn.send({action: 'connected'}); }, 500);
-                });
-            } else {
-                document.getElementById('playerUI').style.display = 'flex';
-                const targetID = prompt("Введите ID Хоста (например, fnaf-1234):", "fnaf-irl-");
-                peer = new Peer();
-                peer.on('open', () => {
-                    const c = peer.connect(targetID);
-                    handlePlayerSync(c);
-                });
-            }
-        }
+            document.getElementById('hostUI').style.display = 'block';
+            
+            // Генерируем случайный короткий ID
+            const hostID = 'fnaf-' + Math.floor(1000 + Math.random() * 9000);
+            peer = new Peer(hostID);
 
-        // Логика игрока
-        function handlePlayerSync(c) {
-            c.on('open', () => {
-                document.getElementById('waitMsg').innerText = "СВЯЗЬ УСТАНОВЛЕНА!";
-                conn = c;
+            peer.on('open', (id) => {
+                document.getElementById('hostStatusLog').innerText = "ID КОМНАТЫ: " + id;
+                console.log("Host ID:", id);
             });
-            c.on('data', data => {
-                const img = document.getElementById('screamImg'), clk = document.getElementById('clock'), win = document.getElementById('winScreen'), wait = document.getElementById('waitMsg');
-                if(data.action === 'connected') { wait.innerText = "ГОТОВ К ИГРЕ"; }
-                if(data.action === 'start') { win.style.display='none'; img.style.display='none'; clk.style.display='block'; wait.style.display='none'; clk.innerText="12:00"; }
-                if(data.action === 'time') clk.innerText = data.h + ":00";
-                if(data.action === 'win') win.style.display='flex';
-                if(data.action === 'scream') { img.src="screamer.png?t="+Date.now(); img.style.display='block'; clk.style.display='none'; setTimeout(()=>img.style.display='none', 4000); }
-                if(data.action === 'stop') { clk.style.display='none'; wait.style.display='block'; wait.innerText="ОЖИДАНИЕ ХОСТА..."; }
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+            });
+
+            peer.on('error', (err) => {
+                alert("Ошибка сети: " + err.type);
+                location.reload();
             });
         }
 
-        // Остальная логика (звуки, режимы, часы) остается прежней
+        function setupConnection() {
+            document.getElementById('statusTxt').innerText = "ONLINE";
+            document.getElementById('statusTxt').style.color = "#00ff41";
+            document.getElementById('hostStatusLog').innerText = "ИГРОК ПОДКЛЮЧЕН!";
+            
+            conn.on('data', (data) => {
+                if(data === 'ping') conn.send('pong');
+            });
+        }
+
+        // --- PLAYER LOGIC ---
+        function initPlayer() {
+            const targetID = prompt("Введите ID комнаты (например, fnaf-1234):");
+            if(!targetID) return;
+
+            document.getElementById('setupOverlay').style.display = 'none';
+            document.getElementById('playerUI').style.display = 'flex';
+            
+            peer = new Peer();
+
+            peer.on('open', () => {
+                conn = peer.connect(targetID);
+                
+                conn.on('open', () => {
+                    document.getElementById('playerStatus').innerText = "СВЯЗЬ УСТАНОВЛЕНА!";
+                    conn.send('ping');
+                });
+
+                conn.on('data', (data) => {
+                    const img = document.getElementById('screamImg'), clk = document.getElementById('clock'), win = document.getElementById('winScreen'), status = document.getElementById('playerStatus');
+                    
+                    if(data.action === 'start') {
+                        win.style.display='none'; img.style.display='none'; clk.style.display='block'; status.style.display='none'; clk.innerText="12:00";
+                    }
+                    if(data.action === 'time') clk.innerText = data.h + ":00";
+                    if(data.action === 'win') win.style.display='flex';
+                    if(data.action === 'scream') {
+                        img.src="screamer.png?t="+Date.now(); img.style.display='block'; clk.style.display='none';
+                        setTimeout(()=>img.style.display='none', 4000);
+                    }
+                    if(data.action === 'stop') {
+                        clk.style.display='none'; status.style.display='block'; status.innerText="ИГРА ОСТАНОВЛЕНА";
+                    }
+                });
+            });
+        }
+
+        // --- GAME ACTIONS ---
+        function beginNight() {
+            if(!conn) return alert("Игрок не подключен!");
+            gameHour = 0;
+            conn.send({ action: 'start' });
+            startClock();
+            toggleSettings();
+        }
+
+        function startClock() {
+            clearInterval(clockTimer);
+            const ms = ((parseInt(document.getElementById('minInput').value)||0)*60 + (parseInt(document.getElementById('secInput').value)||0))*1000;
+            clockTimer = setInterval(() => {
+                gameHour++;
+                if(conn) conn.send({ action: 'time', h: gameHour });
+                if(gameHour >= 6) { clearInterval(clockTimer); setTimeout(finishNight, 2500); }
+            }, ms);
+        }
+
+        function finishNight() {
+            stopAudioOnly();
+            document.getElementById('snd-win').play();
+            if(conn) conn.send({ action: 'win' });
+        }
+
+        function triggerScream() {
+            stopAudioOnly();
+            clearInterval(clockTimer);
+            document.getElementById('snd-window').play();
+            if(conn) conn.send({ action: 'scream' });
+        }
+
+        function fullStop() {
+            clearInterval(clockTimer);
+            stopAudioOnly();
+            if(conn) conn.send({ action: 'stop' });
+        }
+
         async function runModeLoop() {
             if (!modeIsRunning) return;
             const sounds = ['door', 'closet'];
-            let nextSnd = sounds[Math.floor(Math.random() * sounds.length)];
-            const audio = document.getElementById('snd-' + nextSnd);
-            await new Promise(res => { audio.currentTime = 0; audio.play(); audio.onended = res; });
-            if (modeIsRunning) {
-                let p = activeMode === 'normal' ? (Math.random() * 2000 + 2000) : 1000;
-                setTimeout(() => { if(modeIsRunning) runModeLoop(); }, p);
+            const audio = document.getElementById('snd-' + sounds[Math.floor(Math.random()*2)]);
+            await new Promise(r => { audio.currentTime=0; audio.play(); audio.onended=r; });
+            if(modeIsRunning) {
+                setTimeout(runModeLoop, activeMode === 'normal' ? 3000 : 1000);
             }
         }
 
         function toggleMode(m) {
-            if (activeMode === m) { stopAudioOnly(); } 
-            else {
-                stopAudioOnly(); activeMode = m; modeIsRunning = true;
-                document.getElementById(m === 'normal' ? 'modeNormal' : 'modeHard').classList.add('btn-active');
-                runModeLoop();
-            }
+            if(activeMode === m) { stopAudioOnly(); }
+            else { stopAudioOnly(); activeMode = m; modeIsRunning = true; runModeLoop(); document.getElementById('mode'+m.charAt(0).toUpperCase()+m.slice(1)).classList.add('btn-active'); }
         }
 
         function stopAudioOnly() {
             modeIsRunning = false; activeMode = null;
             document.querySelectorAll('.btn').forEach(b => b.classList.remove('btn-active'));
             document.getElementById('nightBtn').classList.remove('active');
-            const ns = document.getElementById('snd-nightmare');
-            ns.pause(); ns.currentTime = 0;
-            document.querySelectorAll('audio').forEach(a => { if(a.id !== 'snd-window' && a.id !== 'snd-win') { a.pause(); a.currentTime = 0; } });
+            document.querySelectorAll('audio').forEach(a => { if(a.id !== 'snd-window' && a.id !== 'snd-win') { a.pause(); a.currentTime=0; }});
         }
 
-        function fullStop() { clearInterval(clockTimer); stopAudioOnly(); if(conn) conn.send({ action: 'stop' }); }
-        function triggerScream() { stopAudioOnly(); clearInterval(clockTimer); document.getElementById('snd-window').play(); if(conn) conn.send({ action: 'scream' }); }
-        function beginNight() { gameHour = 0; if(conn) conn.send({ action: 'start' }); startClock(); toggleSettings(); }
-        function startClock() {
-            clearInterval(clockTimer);
-            const ms = ((parseInt(document.getElementById('minInput').value)||0)*60 + (parseInt(document.getElementById('secInput').value)||0))*1000;
-            clockTimer = setInterval(() => {
-                gameHour++; if(conn) conn.send({ action: 'time', h: gameHour });
-                if(gameHour >= 6) { clearInterval(clockTimer); setTimeout(finishNight, 2500); }
-            }, ms);
-        }
-        function finishNight() { stopAudioOnly(); document.getElementById('snd-win').play(); if(conn) conn.send({ action: 'win' }); }
-        function playSnd(n) { const s = document.getElementById('snd-'+n); s.currentTime=0; s.play(); }
+        function playSnd(n) { document.getElementById('snd-'+n).currentTime=0; document.getElementById('snd-'+n).play(); }
+        
         function toggleNightmare() {
             const s = document.getElementById('snd-nightmare'), b = document.getElementById('nightBtn');
             if(s.paused) { stopAudioOnly(); s.play(); b.classList.add('active'); setTimeout(() => { if(!s.paused) triggerScream(); }, 10000); }
